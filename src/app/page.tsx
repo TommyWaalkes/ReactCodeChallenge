@@ -1,113 +1,194 @@
-import Image from "next/image";
+'use client';
+import { useEffect, useState } from "react";
+import { musician, musicianToMusician, musicType } from "./musician";
+import { matcher } from "./matcher";
+import { musicianDb } from "./musicianDb";
+
+let db = new musicianDb();
+let musicians: musician[] = db.musicians;
+let activeRequests: musicianToMusician[] = [];
+let acceptedRequests: musicianToMusician[] = [];
+activeRequests.push({ id: 0, id1: 1, id2: 2, senderAccepted: true, recieverAccepted: undefined, rating: 5 });
 
 export default function Home() {
+  const [id, setId] = useState(undefined);
+  const [seeRequests, setSeeRequests] = useState(false);
+
+  if (id === undefined) {
+    return <PickUser setId={setId} musicians={musicians} />;
+  } else if (!seeRequests) {
+    return (
+      <>
+        <LogOutUser setId={setId} setSeeRequests={setSeeRequests} />
+        <Match id={id} others={musicians} />
+        <br />
+        {activeRequests.length > 0 && (
+          <button onClick={() => setSeeRequests(true)}>See who swiped right on you</button>
+        )}
+      </>
+    );
+  } else {
+    return (
+      <>
+        <LogOutUser setId={setId} setSeeRequests={setSeeRequests} />
+        <DisplayRequests id={id} />
+      </>
+    );
+  }
+}
+
+export function Match({ id, others }) {
+  let user = db.getById(id);
+  let matchMaker = new matcher();
+  let m2m = matchMaker.getAllRatings(user, others);
+  const [matches, setMatches] = useState(m2m);
+  const [currentindex, setIndex] = useState(0);
+  let match: musician;
+  if (currentindex < matches.length) {
+    match = m2m[currentindex].reciever as musician;
+  }
+  else {
+    let randIndex = Math.floor(Math.random() * (musicians.length + 1));
+    match = musicians[randIndex]
+  }
+
+  function nextIndex() {
+    setIndex(currentindex + 1);
+  }
+
+  function sendMatchRequest(match) {
+    match.senderAccepted = true;
+
+    if (!match.recieverAccepted) {
+      alert('Request sent to ' + match.reciever.name);
+      activeRequests.push(match);
+      nextIndex();
+    } else {
+      acceptedRequests.push(match);
+      let index = activeRequests.indexOf(match);
+      if (index > -1) {
+        activeRequests.splice(index, 1);
+      }
+
+      alert('You may now chat with ' + match.reciever.name + '. Their phone number is 555-5555');
+    }
+  }
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:size-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
+    <>
+      <h2>Musician {user.name}</h2>
+      <MusicianView musician={match} />
+      <SwipeButtons onSwipeLeft={nextIndex} onSwipeRight={() => sendMatchRequest(m2m[currentindex])} />
+      <br />
+    </>
+  );
+}
 
-      <div className="relative z-[-1] flex place-items-center before:absolute before:h-[300px] before:w-full before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 sm:before:w-[480px] sm:after:w-[240px] before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
+export function SwipeButtons({ onSwipeLeft, onSwipeRight }) {
+  return (
+    <>
+      <button onClick={onSwipeLeft}>Swipe left</button>
+      <button onClick={onSwipeRight}>Swipe right</button>
+    </>
+  );
+}
 
-      <div className="mb-32 grid text-center lg:mb-0 lg:w-full lg:max-w-5xl lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
+export function MusicianView({ musician }) {
+  let typeDisplay = musicType[musician.type];
+  return (
+    <>
+      <p>Match:</p>
+      <p>{musician.name}</p>
+      <p>{musician.biography}</p>
+      <p>{musician.genre.join(', ')}</p>
+      <p>{typeDisplay}</p>
+      <br />
+    </>
+  );
+}
 
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
+export function DisplayRequests({ id }) {
+  let user = db.getById(id);
+  let output = <button>Back to matches</button>;
+  if (!user) {
+    return <p>No active requests for musician with ID {id}</p>;
+  }
+  let requests = activeRequests.filter(r => r.id2 === id);
+  const [currentindex, setIndex] = useState(0);
+  const [currentRequests, setRequests] = useState(requests);
 
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Explore starter templates for Next.js.
-          </p>
-        </a>
+  function nextIndex(request) {
+    let index = currentRequests.indexOf(request);
+    if (index > -1) {
+      let updatedRequests = [...currentRequests];
+      updatedRequests.splice(index, 1);
+      setRequests(updatedRequests);
+    }
+  }
 
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-balance text-sm opacity-50">
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+  function sendMatchRequest(request) {
+    request.recieverAccepted = true;
+    acceptedRequests.push(request);
+    let index = currentRequests.indexOf(request);
+    if (index > -1) {
+      let updatedRequests = [...currentRequests];
+      updatedRequests.splice(index, 1);
+      setRequests(updatedRequests);
+    }
+
+    let sender = db.getById(request.id1);
+    alert('You may now chat with ' + sender.name + '. Their phone number is 555-5555');
+  }
+
+  return (
+    <>
+      {currentRequests.length > 0 ? (
+        currentRequests.map((request, index) => (
+          <div key={index}>
+            <MusicianView musician={db.getById(request.id1)} />
+            <SwipeButtons onSwipeLeft={() => nextIndex(request)} onSwipeRight={() => sendMatchRequest(request)} />
+          </div>
+        ))
+      ) : (
+        <p>No active requests for musician {user.name}</p>
+      )}
+    </>
+  );
+}
+
+export function PickUser({ setId, musicians }) {
+  const [selectedUserId, setSelectedUserId] = useState(musicians[0].id);
+
+  const handleSelectChange = (event) => {
+    setSelectedUserId(Number(event.target.value));
+  };
+
+  return (
+    <>
+      <select className="text-black" value={selectedUserId} onChange={handleSelectChange}>
+        {musicians.map((musician) => (
+          <option value={musician.id} key={musician.id}>
+            {musician.name}
+          </option>
+        ))}
+      </select>
+      <button onClick={() => setId(selectedUserId)}>Login</button>
+    </>
+  );
+}
+export function LogOutUser({ setId, setSeeRequests }) {
+  function logOut() {
+    setId(undefined);
+    setSeeRequests(false);
+  }
+  return <button onClick={logOut}>Log Out</button>;
+}
+
+export function Friended(reciever) {
+  return (
+    <>
+      <p>Chat with {reciever.name}</p>
+      <p>Phone number: 555-555-5555</p>
+    </>
   );
 }
